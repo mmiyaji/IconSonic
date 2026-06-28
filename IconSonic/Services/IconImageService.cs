@@ -199,7 +199,7 @@ public sealed class IconImageService
         stream.Seek(0);
         byte[] output = new byte[stream.Size];
         using Stream managed = stream.AsStreamForRead();
-        _ = await managed.ReadAsync(output);
+        await managed.ReadExactlyAsync(output);
         return output;
     }
 
@@ -235,7 +235,7 @@ public sealed class IconImageService
         int maskOffset = pixelOffset + (xorStride * height);
 
         byte[] output = new byte[width * height * 4];
-        bool hasAlpha = false;
+        bool hasExplicitAlpha = false;
 
         for (int y = 0; y < height; y++)
         {
@@ -251,11 +251,11 @@ public sealed class IconImageService
                 output[target + 1] = bytes[source + 1];
                 output[target + 2] = bytes[source + 2];
                 output[target + 3] = bitCount == 32 ? bytes[source + 3] : (byte)255;
-                hasAlpha |= output[target + 3] != 0;
+                hasExplicitAlpha |= bitCount == 32 && output[target + 3] != 0;
             }
         }
 
-        if (!hasAlpha && maskOffset + (andStride * height) <= bytes.Length)
+        if ((bitCount == 24 || !hasExplicitAlpha) && maskOffset + (andStride * height) <= bytes.Length)
         {
             for (int y = 0; y < height; y++)
             {
