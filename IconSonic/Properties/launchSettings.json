@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "IconSonic (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "IconSonic (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
