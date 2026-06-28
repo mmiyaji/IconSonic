@@ -371,27 +371,40 @@
                     BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="{ThemeResource ControlCornerRadius}">
-                    <Grid
-                        x:Name="EditorSurface"
-                        Margin="16"
-                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
-                        PointerExited="EditorSurface_PointerExited"
-                        PointerMoved="EditorSurface_PointerMoved"
-                        PointerPressed="EditorSurface_PointerPressed"
-                        PointerReleased="EditorSurface_PointerReleased"
-                        SizeChanged="EditorSurface_SizeChanged">
-                        <Image
-                            x:Name="PixelImage"
-                            AutomationProperties.AutomationId="ImgPixelEditor"
-                            Source="{x:Bind ViewModel.SelectedPreview, Mode=OneWay}"
-                            Stretch="Uniform" />
-                        <Canvas
-                            x:Name="GridOverlay"
-                            IsHitTestVisible="False" />
-                        <Canvas
-                            x:Name="ObjectPreviewOverlay"
-                            IsHitTestVisible="False" />
-                    </Grid>
+                    <ScrollViewer
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto"
+                        ZoomMode="Disabled">
+                        <Grid Padding="16">
+                            <Grid
+                                x:Name="EditorSurface"
+                                Width="{x:Bind ViewModel.EditorCanvasDip, Mode=OneWay}"
+                                Height="{x:Bind ViewModel.EditorCanvasDip, Mode=OneWay}"
+                                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                                PointerExited="EditorSurface_PointerExited"
+                                PointerMoved="EditorSurface_PointerMoved"
+                                PointerPressed="EditorSurface_PointerPressed"
+                                PointerReleased="EditorSurface_PointerReleased"
+                                SizeChanged="EditorSurface_SizeChanged">
+                                <Canvas
+                                    x:Name="CheckerboardOverlay"
+                                    IsHitTestVisible="False"
+                                    Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.IsCheckerboardVisible), Mode=OneWay}" />
+                                <Image
+                                    x:Name="PixelImage"
+                                    AutomationProperties.AutomationId="ImgPixelEditor"
+                                    Source="{x:Bind ViewModel.SelectedPreview, Mode=OneWay}"
+                                    Stretch="Uniform" />
+                                <Canvas
+                                    x:Name="GridOverlay"
+                                    IsHitTestVisible="False"
+                                    Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.IsGridVisible), Mode=OneWay}" />
+                                <Canvas
+                                    x:Name="ObjectPreviewOverlay"
+                                    IsHitTestVisible="False" />
+                            </Grid>
+                        </Grid>
+                    </ScrollViewer>
                 </Border>
             </Grid>
 
@@ -409,6 +422,55 @@
                             AutomationProperties.AutomationId="TglApplyToAllSizes"
                             Header="Apply to all sizes"
                             IsOn="{x:Bind ViewModel.IsApplyToAllFrames, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="12">
+                        <TextBlock
+                            Text="View"
+                            Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <ToggleSwitch
+                            AutomationProperties.AutomationId="TglGridVisible"
+                            Header="Grid"
+                            IsOn="{x:Bind ViewModel.IsGridVisible, Mode=TwoWay}" />
+                        <ToggleSwitch
+                            AutomationProperties.AutomationId="TglCheckerboardVisible"
+                            Header="Transparency checkerboard"
+                            IsOn="{x:Bind ViewModel.IsCheckerboardVisible, Mode=TwoWay}" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="40" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="40" />
+                            </Grid.ColumnDefinitions>
+                            <Button
+                                Width="40"
+                                AutomationProperties.AutomationId="BtnZoomOut"
+                                AutomationProperties.Name="Zoom out"
+                                Command="{x:Bind ViewModel.ZoomOutCommand, Mode=OneTime}"
+                                ToolTipService.ToolTip="Zoom out">
+                                <FontIcon Glyph="&#xE738;" />
+                            </Button>
+                            <Button
+                                Grid.Column="1"
+                                HorizontalAlignment="Stretch"
+                                AutomationProperties.AutomationId="BtnResetZoom"
+                                AutomationProperties.Name="Reset zoom"
+                                Command="{x:Bind ViewModel.ResetZoomCommand, Mode=OneTime}"
+                                ToolTipService.ToolTip="Reset zoom">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    Text="{x:Bind ViewModel.ZoomLabel, Mode=OneWay}" />
+                            </Button>
+                            <Button
+                                Grid.Column="2"
+                                Width="40"
+                                AutomationProperties.AutomationId="BtnZoomIn"
+                                AutomationProperties.Name="Zoom in"
+                                Command="{x:Bind ViewModel.ZoomInCommand, Mode=OneTime}"
+                                ToolTipService.ToolTip="Zoom in">
+                                <FontIcon Glyph="&#xE710;" />
+                            </Button>
+                        </Grid>
                     </StackPanel>
 
                     <StackPanel Spacing="12">
@@ -481,6 +543,15 @@
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE8C8;" />
                                 <TextBlock Text="Copy selected to size" />
+                            </StackPanel>
+                        </Button>
+                        <Button
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="BtnDeleteSelectedFrame"
+                            Command="{x:Bind ViewModel.DeleteSelectedFrameCommand, Mode=OneTime}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE74D;" />
+                                <TextBlock Text="Delete selected size" />
                             </StackPanel>
                         </Button>
                     </StackPanel>

@@ -11,6 +11,9 @@ namespace IconSonic.ViewModels;
 public partial class MainPageViewModel : ObservableObject
 {
     private const int MaxHistoryDepth = 80;
+    private const double MinZoomPercent = 50;
+    private const double MaxZoomPercent = 400;
+    private const double ZoomStepPercent = 25;
     private readonly IconImageService _imageService = new();
     private readonly List<DocumentSnapshot> _undoHistory = [];
     private readonly List<DocumentSnapshot> _redoHistory = [];
@@ -49,6 +52,15 @@ public partial class MainPageViewModel : ObservableObject
     public partial bool IsApplyToAllFrames { get; set; }
 
     [ObservableProperty]
+    public partial bool IsGridVisible { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool IsCheckerboardVisible { get; set; } = true;
+
+    [ObservableProperty]
+    public partial double ZoomPercent { get; set; } = 100;
+
+    [ObservableProperty]
     public partial double ObjectStrokeWidth { get; set; } = 1;
 
     [ObservableProperty]
@@ -70,6 +82,8 @@ public partial class MainPageViewModel : ObservableObject
 
     public bool HasFrames => Frames.Count > 0;
 
+    public bool CanDeleteSelectedFrame => SelectedFrame is not null && Frames.Count > 1;
+
     public bool CanUndo => _undoHistory.Count > 0;
 
     public bool CanRedo => _redoHistory.Count > 0;
@@ -78,16 +92,36 @@ public partial class MainPageViewModel : ObservableObject
 
     public string SelectedFrameTitle => SelectedFrame is null ? "No frame selected" : $"{SelectedFrame.SizeLabel} pixel editor";
 
+    public string ZoomLabel => $"{ZoomPercent:0}%";
+
+    public double EditorCanvasDip
+    {
+        get
+        {
+            int frameSize = SelectedFrame?.Size ?? 32;
+            return Math.Clamp(frameSize * 16.0 * ZoomPercent / 100.0, 256, 2048);
+        }
+    }
+
     partial void OnSelectedFrameChanged(IconFrame? value)
     {
         OnPropertyChanged(nameof(HasSelectedFrame));
+        OnPropertyChanged(nameof(CanDeleteSelectedFrame));
         OnPropertyChanged(nameof(SelectedPreview));
         OnPropertyChanged(nameof(SelectedFrameTitle));
+        OnPropertyChanged(nameof(EditorCanvasDip));
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
+        DeleteSelectedFrameCommand.NotifyCanExecuteChanged();
         ClearSelectedCommand.NotifyCanExecuteChanged();
         MirrorHorizontalCommand.NotifyCanExecuteChanged();
         MirrorVerticalCommand.NotifyCanExecuteChanged();
         StatusText = value is null ? "No frame selected." : $"Editing {value.SizeLabel}.";
+    }
+
+    partial void OnZoomPercentChanged(double value)
+    {
+        OnPropertyChanged(nameof(ZoomLabel));
+        OnPropertyChanged(nameof(EditorCanvasDip));
     }
 
     partial void OnIsBusyChanged(bool value)
@@ -194,6 +228,32 @@ public partial class MainPageViewModel : ObservableObject
         StatusText = $"Copied the selected image into {copy.SizeLabel}.";
     }
 
+    [RelayCommand(CanExecute = nameof(CanDeleteSelectedFrame))]
+    public void DeleteSelectedFrame()
+    {
+        if (SelectedFrame is null)
+        {
+            return;
+        }
+
+        if (Frames.Count <= 1)
+        {
+            StatusText = "Keep at least one icon size.";
+            return;
+        }
+
+        RecordUndoCheckpoint();
+        int selectedIndex = Frames.IndexOf(SelectedFrame);
+        string deletedLabel = SelectedFrame.SizeLabel;
+        Frames.Remove(SelectedFrame);
+
+        int nextIndex = Math.Clamp(selectedIndex, 0, Frames.Count - 1);
+        SelectedFrame = Frames[nextIndex];
+        RefreshPalette();
+        UpdateDocumentStats();
+        StatusText = $"Deleted {deletedLabel}.";
+    }
+
     [RelayCommand(CanExecute = nameof(HasSelectedFrame))]
     public void ClearSelected()
     {
@@ -235,6 +295,24 @@ public partial class MainPageViewModel : ObservableObject
         RefreshPalette();
         UpdateDocumentStats();
         StatusText = "Generated the standard Windows ICO size set.";
+    }
+
+    [RelayCommand]
+    public void ZoomIn()
+    {
+        ZoomPercent = Math.Min(MaxZoomPercent, ZoomPercent + ZoomStepPercent);
+    }
+
+    [RelayCommand]
+    public void ZoomOut()
+    {
+        ZoomPercent = Math.Max(MinZoomPercent, ZoomPercent - ZoomStepPercent);
+    }
+
+    [RelayCommand]
+    public void ResetZoom()
+    {
+        ZoomPercent = 100;
     }
 
     [RelayCommand(CanExecute = nameof(HasSelectedFrame))]
@@ -770,7 +848,9 @@ public partial class MainPageViewModel : ObservableObject
     private void UpdateDocumentStats()
     {
         OnPropertyChanged(nameof(HasFrames));
+        OnPropertyChanged(nameof(CanDeleteSelectedFrame));
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
+        DeleteSelectedFrameCommand.NotifyCanExecuteChanged();
         ClearSelectedCommand.NotifyCanExecuteChanged();
         MirrorHorizontalCommand.NotifyCanExecuteChanged();
         MirrorVerticalCommand.NotifyCanExecuteChanged();

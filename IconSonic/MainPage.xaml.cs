@@ -25,7 +25,14 @@ public sealed partial class MainPage : Page
         InitializeComponent();
         ViewModel.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName is nameof(ViewModel.SelectedFrame) or nameof(ViewModel.SelectedPreview))
+            if (args.PropertyName is nameof(ViewModel.SelectedFrame)
+                or nameof(ViewModel.SelectedPreview)
+                or nameof(ViewModel.EditorCanvasDip)
+                or nameof(ViewModel.IsCheckerboardVisible))
+            {
+                RefreshEditorOverlays();
+            }
+            else if (args.PropertyName is nameof(ViewModel.IsGridVisible))
             {
                 UpdateGridOverlay();
             }
@@ -64,7 +71,7 @@ public sealed partial class MainPage : Page
         {
             await ViewModel.OpenImageAsync(file.Path);
             FrameListView.SelectedItem = ViewModel.SelectedFrame;
-            UpdateGridOverlay();
+            RefreshEditorOverlays();
         }
     }
 
@@ -83,7 +90,7 @@ public sealed partial class MainPage : Page
         {
             await ViewModel.OpenIconAsync(file.Path);
             FrameListView.SelectedItem = ViewModel.SelectedFrame;
-            UpdateGridOverlay();
+            RefreshEditorOverlays();
         }
     }
 
@@ -109,7 +116,7 @@ public sealed partial class MainPage : Page
     {
         ViewModel.NewBlank();
         FrameListView.SelectedItem = ViewModel.SelectedFrame;
-        UpdateGridOverlay();
+        RefreshEditorOverlays();
     }
 
     private void ToolButton_Click(object sender, RoutedEventArgs e)
@@ -147,7 +154,7 @@ public sealed partial class MainPage : Page
 
     private void FrameListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        UpdateGridOverlay();
+        RefreshEditorOverlays();
     }
 
     private void EditorSurface_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -214,7 +221,7 @@ public sealed partial class MainPage : Page
 
     private void EditorSurface_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        UpdateGridOverlay();
+        RefreshEditorOverlays();
     }
 
     private void UndoKeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -223,7 +230,7 @@ public sealed partial class MainPage : Page
         {
             ViewModel.UndoCommand.Execute(null);
             FrameListView.SelectedItem = ViewModel.SelectedFrame;
-            UpdateGridOverlay();
+            RefreshEditorOverlays();
             args.Handled = true;
         }
     }
@@ -234,7 +241,7 @@ public sealed partial class MainPage : Page
         {
             ViewModel.RedoCommand.Execute(null);
             FrameListView.SelectedItem = ViewModel.SelectedFrame;
-            UpdateGridOverlay();
+            RefreshEditorOverlays();
             args.Handled = true;
         }
     }
@@ -295,6 +302,53 @@ public sealed partial class MainPage : Page
         foreach (AppBarToggleButton button in buttons)
         {
             button.IsChecked = ReferenceEquals(button, selected);
+        }
+    }
+
+    private void RefreshEditorOverlays()
+    {
+        UpdateCheckerboardOverlay();
+        UpdateGridOverlay();
+    }
+
+    private void UpdateCheckerboardOverlay()
+    {
+        CheckerboardOverlay.Children.Clear();
+        if (!ViewModel.IsCheckerboardVisible
+            || ViewModel.SelectedFrame is null
+            || EditorSurface.ActualWidth <= 0
+            || EditorSurface.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        (double left, double top, double drawSize) = GetDrawBounds();
+        double cellSize = Math.Max(8, drawSize / 32);
+        int columns = (int)Math.Ceiling(drawSize / cellSize);
+        int rows = (int)Math.Ceiling(drawSize / cellSize);
+        Brush squareBrush = CreateCheckerboardBrush();
+
+        for (int row = 0; row < rows; row++)
+        {
+            for (int column = 0; column < columns; column++)
+            {
+                if ((row + column) % 2 == 0)
+                {
+                    continue;
+                }
+
+                double x = left + column * cellSize;
+                double y = top + row * cellSize;
+                Rectangle square = new()
+                {
+                    Width = Math.Min(cellSize, left + drawSize - x),
+                    Height = Math.Min(cellSize, top + drawSize - y),
+                    Fill = squareBrush
+                };
+                Canvas.SetLeft(square, x);
+                Canvas.SetTop(square, y);
+                CheckerboardOverlay.Children.Add(square);
+            }
         }
     }
 
@@ -506,6 +560,17 @@ public sealed partial class MainPage : Page
         }
 
         return new SolidColorBrush(Color.FromArgb(80, 128, 128, 128));
+    }
+
+    private static Brush CreateCheckerboardBrush()
+    {
+        if (Application.Current.Resources.TryGetValue("ControlFillColorSecondaryBrush", out object value)
+            && value is SolidColorBrush solidColorBrush)
+        {
+            return new SolidColorBrush(solidColorBrush.Color) { Opacity = 0.72 };
+        }
+
+        return new SolidColorBrush(Color.FromArgb(28, 128, 128, 128));
     }
 
     private static Brush CreatePreviewBrush()
