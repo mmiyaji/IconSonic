@@ -5,26 +5,394 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:IconSonic"
+    xmlns:models="using:IconSonic.Models"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
     mc:Ignorable="d">
 
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-        <TextBlock
-            Text="{x:Bind ViewModel.Greeting, Mode=OneWay}"
-            Style="{StaticResource TitleTextBlockStyle}" />
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
-            <Button Command="{x:Bind ViewModel.IncrementCommand}">
-                <FontIcon Glyph="&#xE710;" FontSize="14" />
-            </Button>
+    <Page.Resources>
+        <DataTemplate x:Key="FrameTemplate" x:DataType="models:IconFrame">
+            <Grid Padding="8" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="52" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Border
+                    Width="44"
+                    Height="44"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{ThemeResource ControlCornerRadius}">
+                    <Image
+                        Margin="4"
+                        Source="{x:Bind Preview, Mode=OneWay}"
+                        Stretch="Uniform" />
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock
+                        Text="{x:Bind SizeLabel}"
+                        Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <TextBlock
+                        Text="{x:Bind SourceLabel}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{StaticResource CaptionTextBlockStyle}" />
+                </StackPanel>
+
+                <CheckBox
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="ChkIncludeFrame"
+                    IsChecked="{x:Bind IsIncluded, Mode=TwoWay}"
+                    Click="IncludeCheckBox_Click" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PaletteTemplate" x:DataType="models:PaletteSwatch">
+            <Button
+                Width="32"
+                Height="32"
+                Margin="0,0,8,8"
+                Padding="0"
+                AutomationProperties.AutomationId="BtnPaletteColor"
+                Background="{x:Bind local:MainPage.ColorToBrush(Color), Mode=OneTime}"
+                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                Click="PaletteColor_Click" />
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid RowSpacing="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <CommandBar
+            x:Name="MainCommandBar"
+            Grid.Row="0"
+            DefaultLabelPosition="Right"
+            IsDynamicOverflowEnabled="True"
+            OverflowButtonVisibility="Auto">
+            <AppBarButton
+                x:Name="OpenImageButton"
+                AutomationProperties.AutomationId="BtnOpenImage"
+                Click="OpenImageButton_Click"
+                Icon="OpenFile"
+                Label="Open image" />
+            <AppBarButton
+                x:Name="OpenIconButton"
+                AutomationProperties.AutomationId="BtnOpenIcon"
+                Click="OpenIconButton_Click"
+                Icon="Pictures"
+                Label="Open ICO" />
+            <AppBarButton
+                x:Name="NewBlankButton"
+                AutomationProperties.AutomationId="BtnNewBlank"
+                Click="NewBlankButton_Click"
+                Icon="Document"
+                Label="New" />
+            <AppBarSeparator />
+            <AppBarButton
+                x:Name="ExportIconButton"
+                AutomationProperties.AutomationId="BtnExportIcon"
+                Click="ExportIconButton_Click"
+                Icon="Save"
+                Label="Export ICO" />
+
+            <CommandBar.Content>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <ProgressRing
+                        Width="20"
+                        Height="20"
+                        IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
+                        Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.IsBusy), Mode=OneWay}" />
+                    <StackPanel VerticalAlignment="Center" Spacing="0">
+                        <TextBlock
+                            Text="{x:Bind ViewModel.DocumentName, Mode=OneWay}"
+                            Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <TextBlock
+                            Text="{x:Bind ViewModel.FrameSummary, Mode=OneWay}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}" />
+                    </StackPanel>
+                </StackPanel>
+            </CommandBar.Content>
+        </CommandBar>
+
+        <Grid Grid.Row="1" ColumnSpacing="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="340" />
+            </Grid.ColumnDefinitions>
+
+            <Grid
+                Grid.Column="0"
+                Padding="16"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,1,0"
+                RowSpacing="12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock
+                    Text="Sizes"
+                    Style="{StaticResource SubtitleTextBlockStyle}" />
+
+                <ListView
+                    x:Name="FrameListView"
+                    Grid.Row="1"
+                    AutomationProperties.AutomationId="LstFrames"
+                    ItemTemplate="{StaticResource FrameTemplate}"
+                    ItemsSource="{x:Bind ViewModel.Frames, Mode=OneWay}"
+                    SelectedItem="{x:Bind ViewModel.SelectedFrame, Mode=TwoWay}"
+                    SelectionChanged="FrameListView_SelectionChanged"
+                    SelectionMode="Single" />
+
+                <StackPanel Grid.Row="2" Spacing="8">
+                    <TextBlock
+                        Text="Add size"
+                        Style="{StaticResource CaptionTextBlockStyle}" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <NumberBox
+                            x:Name="NewFrameSizeBox"
+                            AutomationProperties.AutomationId="NumNewFrameSize"
+                            Minimum="16"
+                            Maximum="256"
+                            SmallChange="8"
+                            SpinButtonPlacementMode="Inline"
+                            Value="{x:Bind ViewModel.NewFrameSize, Mode=TwoWay}" />
+                        <Button
+                            Grid.Column="1"
+                            AutomationProperties.AutomationId="BtnAddBlankFrame"
+                            Command="{x:Bind ViewModel.AddBlankFrameCommand}"
+                            ToolTipService.ToolTip="Add blank frame">
+                            <FontIcon Glyph="&#xE710;" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+
+            <Grid
+                Grid.Column="1"
+                Padding="20"
+                RowSpacing="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock
+                            Text="{x:Bind ViewModel.SelectedFrameTitle, Mode=OneWay}"
+                            Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock
+                            Text="{x:Bind ViewModel.PointerText, Mode=OneWay}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}" />
+                    </StackPanel>
+                    <CommandBar
+                        Grid.Column="1"
+                        DefaultLabelPosition="Collapsed"
+                        IsOpen="False"
+                        OverflowButtonVisibility="Collapsed">
+                        <AppBarToggleButton
+                            x:Name="PencilToolButton"
+                            AutomationProperties.AutomationId="TglPencilTool"
+                            Click="ToolButton_Click"
+                            Icon="Edit"
+                            IsChecked="True"
+                            Label="Pencil"
+                            Tag="Pencil" />
+                        <AppBarToggleButton
+                            x:Name="EraserToolButton"
+                            AutomationProperties.AutomationId="TglEraserTool"
+                            Click="ToolButton_Click"
+                            Icon="Clear"
+                            Label="Eraser"
+                            Tag="Eraser" />
+                        <AppBarToggleButton
+                            x:Name="FillToolButton"
+                            AutomationProperties.AutomationId="TglFillTool"
+                            Click="ToolButton_Click"
+                            Icon="Bucket"
+                            Label="Fill"
+                            Tag="Fill" />
+                        <AppBarToggleButton
+                            x:Name="EyedropperToolButton"
+                            AutomationProperties.AutomationId="TglEyedropperTool"
+                            Click="ToolButton_Click"
+                            Icon="PreviewLink"
+                            Label="Pick"
+                            Tag="Eyedropper" />
+                    </CommandBar>
+                </Grid>
+
+                <Border
+                    x:Name="EditorHost"
+                    Grid.Row="1"
+                    MinHeight="360"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{ThemeResource ControlCornerRadius}">
+                    <Grid
+                        x:Name="EditorSurface"
+                        Margin="16"
+                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                        PointerExited="EditorSurface_PointerExited"
+                        PointerMoved="EditorSurface_PointerMoved"
+                        PointerPressed="EditorSurface_PointerPressed"
+                        PointerReleased="EditorSurface_PointerReleased"
+                        SizeChanged="EditorSurface_SizeChanged">
+                        <Image
+                            x:Name="PixelImage"
+                            AutomationProperties.AutomationId="ImgPixelEditor"
+                            Source="{x:Bind ViewModel.SelectedPreview, Mode=OneWay}"
+                            Stretch="Uniform" />
+                        <Canvas
+                            x:Name="GridOverlay"
+                            IsHitTestVisible="False" />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <ScrollViewer
+                Grid.Column="2"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1,0,0,0"
+                VerticalScrollBarVisibility="Auto">
+                <StackPanel Padding="16" Spacing="20">
+                    <StackPanel Spacing="12">
+                        <TextBlock
+                            Text="Color"
+                            Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <ColorPicker
+                            x:Name="EditorColorPicker"
+                            AutomationProperties.AutomationId="PickerBrushColor"
+                            Color="{x:Bind ViewModel.BrushColor, Mode=TwoWay}"
+                            ColorChanged="EditorColorPicker_ColorChanged"
+                            ColorSpectrumShape="Box"
+                            IsAlphaEnabled="True"
+                            IsAlphaSliderVisible="True"
+                            IsAlphaTextInputVisible="True"
+                            IsColorChannelTextInputVisible="True"
+                            IsColorSliderVisible="True"
+                            IsHexInputVisible="True"
+                            IsMoreButtonVisible="False" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="12">
+                        <TextBlock
+                            Text="Palette"
+                            Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <ItemsControl
+                            AutomationProperties.AutomationId="LstPalette"
+                            ItemTemplate="{StaticResource PaletteTemplate}"
+                            ItemsSource="{x:Bind ViewModel.Palette, Mode=OneWay}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <ItemsWrapGrid MaximumRowsOrColumns="6" Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel Spacing="12">
+                        <TextBlock
+                            Text="Build"
+                            Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Button
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="BtnGenerateCommonSizes"
+                            Command="{x:Bind ViewModel.GenerateCommonSizesCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE72C;" />
+                                <TextBlock Text="Generate Windows sizes" />
+                            </StackPanel>
+                        </Button>
+                        <Button
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="BtnDuplicateSelected"
+                            Command="{x:Bind ViewModel.DuplicateSelectedCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE8C8;" />
+                                <TextBlock Text="Duplicate selected" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel Spacing="12">
+                        <TextBlock
+                            Text="Transform"
+                            Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button
+                                HorizontalAlignment="Stretch"
+                                AutomationProperties.AutomationId="BtnMirrorHorizontal"
+                                Command="{x:Bind ViewModel.MirrorHorizontalCommand}">
+                                <FontIcon Glyph="&#xE8AB;" />
+                            </Button>
+                            <Button
+                                Grid.Column="1"
+                                HorizontalAlignment="Stretch"
+                                AutomationProperties.AutomationId="BtnMirrorVertical"
+                                Command="{x:Bind ViewModel.MirrorVerticalCommand}">
+                                <FontIcon Glyph="&#xE8AC;" />
+                            </Button>
+                        </Grid>
+                        <Button
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="BtnClearSelected"
+                            Command="{x:Bind ViewModel.ClearSelectedCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE74D;" />
+                                <TextBlock Text="Clear selected" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <InfoBar
+                        x:Name="StatusInfoBar"
+                        AutomationProperties.AutomationId="InfoStatus"
+                        IsClosable="False"
+                        IsOpen="True"
+                        Message="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                        Severity="Informational" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <Grid
+            Grid.Row="2"
+            Padding="16,8"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0">
             <TextBlock
-                Text="{x:Bind ViewModel.Counter, Mode=OneWay}"
-                VerticalAlignment="Center"
-                MinWidth="40"
-                TextAlignment="Center"
-                Style="{StaticResource BodyStrongTextBlockStyle}" />
-            <Button Command="{x:Bind ViewModel.DecrementCommand}">
-                <FontIcon Glyph="&#xE738;" FontSize="14" />
-            </Button>
-        </StackPanel>
-    </StackPanel>
+                AutomationProperties.AutomationId="TxtStatusBar"
+                Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                Style="{StaticResource CaptionTextBlockStyle}" />
+        </Grid>
+    </Grid>
 </Page>

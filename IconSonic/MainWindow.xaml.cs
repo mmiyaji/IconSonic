@@ -1,4 +1,7 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI;
+using System.Runtime.InteropServices;
+using Windows.Graphics;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -12,6 +15,9 @@ namespace IconSonic;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(nint hWnd);
+
     public MainWindow()
     {
         InitializeComponent();
@@ -20,8 +26,16 @@ public sealed partial class MainWindow : Window
         SetTitleBar(AppTitleBar);
 
         AppWindow.SetIcon("Assets/AppIcon.ico");
+        ResizeForEditor();
 
         // Navigate the root frame to the main page on startup.
         RootFrame.Navigate(typeof(MainPage));
+    }
+
+    private void ResizeForEditor()
+    {
+        nint hwnd = Win32Interop.GetWindowFromWindowId(AppWindow.Id);
+        double scale = GetDpiForWindow(hwnd) / 96.0;
+        AppWindow.Resize(new SizeInt32((int)(1360 * scale), (int)(860 * scale)));
     }
 }
