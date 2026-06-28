@@ -64,6 +64,7 @@
                     Grid.Column="2"
                     VerticalAlignment="Center"
                     AutomationProperties.AutomationId="ChkIncludeFrame"
+                    AutomationProperties.Name="{x:Bind local:MainPage.IncludeFrameAutomationName(SizeLabel), Mode=OneWay}"
                     IsChecked="{x:Bind IsIncluded, Mode=TwoWay}"
                     Click="IncludeCheckBox_Click" />
             </Grid>
@@ -76,6 +77,7 @@
                 Margin="0,0,8,8"
                 Padding="0"
                 AutomationProperties.AutomationId="BtnPaletteColor"
+                AutomationProperties.Name="{x:Bind local:MainPage.PaletteColorAutomationName(Color), Mode=OneTime}"
                 Background="{x:Bind local:MainPage.ColorToBrush(Color), Mode=OneTime}"
                 BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                 Click="PaletteColor_Click" />
