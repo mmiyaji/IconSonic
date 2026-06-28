@@ -25,6 +25,8 @@ public partial class IconFrame : ObservableObject
 
     public string SizeLabel => $"{Size} x {Size}";
 
+    public string SizeListLabel => Size.ToString();
+
     public string PixelCountLabel => $"{Size * Size:N0} px";
 
     public string SourceLabel { get; }
@@ -73,7 +75,7 @@ public partial class IconFrame : ObservableObject
     public void RefreshPreview()
     {
         using Stream pixelStream = _preview.PixelBuffer.AsStream();
-        pixelStream.SetLength(0);
+        pixelStream.Seek(0, SeekOrigin.Begin);
         pixelStream.Write(Pixels, 0, Pixels.Length);
         _preview.Invalidate();
         OnPropertyChanged(nameof(Preview));

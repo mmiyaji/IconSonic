@@ -12,7 +12,7 @@
 
     <Page.Resources>
         <DataTemplate x:Key="FrameTemplate" x:DataType="models:IconFrame">
-            <Grid Padding="8" ColumnSpacing="12">
+            <Grid Padding="8" ColumnSpacing="12" HorizontalAlignment="Stretch" MinWidth="236">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="52" />
                     <ColumnDefinition Width="*" />
@@ -34,11 +34,14 @@
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                     <TextBlock
-                        Text="{x:Bind SizeLabel}"
+                        MinWidth="64"
+                        Text="{x:Bind SizeListLabel, Mode=OneWay}"
+                        TextWrapping="NoWrap"
                         Style="{StaticResource BodyStrongTextBlockStyle}" />
                     <TextBlock
-                        Text="{x:Bind SourceLabel}"
+                        Text="{x:Bind SourceLabel, Mode=OneWay}"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextWrapping="NoWrap"
                         Style="{StaticResource CaptionTextBlockStyle}" />
                 </StackPanel>
 
@@ -154,7 +157,13 @@
                     ItemsSource="{x:Bind ViewModel.Frames, Mode=OneWay}"
                     SelectedItem="{x:Bind ViewModel.SelectedFrame, Mode=TwoWay}"
                     SelectionChanged="FrameListView_SelectionChanged"
-                    SelectionMode="Single" />
+                    SelectionMode="Single">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                </ListView>
 
                 <StackPanel Grid.Row="2" Spacing="8">
                     <TextBlock
@@ -176,7 +185,8 @@
                         <Button
                             Grid.Column="1"
                             AutomationProperties.AutomationId="BtnAddBlankFrame"
-                            Command="{x:Bind ViewModel.AddBlankFrameCommand}"
+                            AutomationProperties.Name="Add blank frame"
+                            Command="{x:Bind ViewModel.AddBlankFrameCommand, Mode=OneTime}"
                             ToolTipService.ToolTip="Add blank frame">
                             <FontIcon Glyph="&#xE710;" />
                         </Button>
@@ -216,31 +226,47 @@
                             x:Name="PencilToolButton"
                             AutomationProperties.AutomationId="TglPencilTool"
                             Click="ToolButton_Click"
-                            Icon="Edit"
                             IsChecked="True"
                             Label="Pencil"
-                            Tag="Pencil" />
+                            Tag="Pencil"
+                            ToolTipService.ToolTip="Pencil">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xE70F;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
                         <AppBarToggleButton
                             x:Name="EraserToolButton"
                             AutomationProperties.AutomationId="TglEraserTool"
                             Click="ToolButton_Click"
-                            Icon="Clear"
                             Label="Eraser"
-                            Tag="Eraser" />
+                            Tag="Eraser"
+                            ToolTipService.ToolTip="Eraser">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xE75C;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
                         <AppBarToggleButton
                             x:Name="FillToolButton"
                             AutomationProperties.AutomationId="TglFillTool"
                             Click="ToolButton_Click"
-                            Icon="Bucket"
                             Label="Fill"
-                            Tag="Fill" />
+                            Tag="Fill"
+                            ToolTipService.ToolTip="Fill">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xE771;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
                         <AppBarToggleButton
                             x:Name="EyedropperToolButton"
                             AutomationProperties.AutomationId="TglEyedropperTool"
                             Click="ToolButton_Click"
-                            Icon="PreviewLink"
                             Label="Pick"
-                            Tag="Eyedropper" />
+                            Tag="Eyedropper"
+                            ToolTipService.ToolTip="Eyedropper">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xE721;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
                     </CommandBar>
                 </Grid>
 
@@ -285,6 +311,7 @@
                             Style="{StaticResource SubtitleTextBlockStyle}" />
                         <ColorPicker
                             x:Name="EditorColorPicker"
+                            MaxWidth="300"
                             AutomationProperties.AutomationId="PickerBrushColor"
                             Color="{x:Bind ViewModel.BrushColor, Mode=TwoWay}"
                             ColorChanged="EditorColorPicker_ColorChanged"
@@ -321,7 +348,7 @@
                         <Button
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="BtnGenerateCommonSizes"
-                            Command="{x:Bind ViewModel.GenerateCommonSizesCommand}">
+                            Command="{x:Bind ViewModel.GenerateCommonSizesCommand, Mode=OneTime}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE72C;" />
                                 <TextBlock Text="Generate Windows sizes" />
@@ -330,7 +357,7 @@
                         <Button
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="BtnDuplicateSelected"
-                            Command="{x:Bind ViewModel.DuplicateSelectedCommand}">
+                            Command="{x:Bind ViewModel.DuplicateSelectedCommand, Mode=OneTime}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE8C8;" />
                                 <TextBlock Text="Duplicate selected" />
@@ -350,21 +377,25 @@
                             <Button
                                 HorizontalAlignment="Stretch"
                                 AutomationProperties.AutomationId="BtnMirrorHorizontal"
-                                Command="{x:Bind ViewModel.MirrorHorizontalCommand}">
+                                AutomationProperties.Name="Mirror horizontal"
+                                Command="{x:Bind ViewModel.MirrorHorizontalCommand, Mode=OneTime}"
+                                ToolTipService.ToolTip="Mirror horizontal">
                                 <FontIcon Glyph="&#xE8AB;" />
                             </Button>
                             <Button
                                 Grid.Column="1"
                                 HorizontalAlignment="Stretch"
                                 AutomationProperties.AutomationId="BtnMirrorVertical"
-                                Command="{x:Bind ViewModel.MirrorVerticalCommand}">
+                                AutomationProperties.Name="Mirror vertical"
+                                Command="{x:Bind ViewModel.MirrorVerticalCommand, Mode=OneTime}"
+                                ToolTipService.ToolTip="Mirror vertical">
                                 <FontIcon Glyph="&#xE8AC;" />
                             </Button>
                         </Grid>
                         <Button
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="BtnClearSelected"
-                            Command="{x:Bind ViewModel.ClearSelectedCommand}">
+                            Command="{x:Bind ViewModel.ClearSelectedCommand, Mode=OneTime}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE74D;" />
                                 <TextBlock Text="Clear selected" />
