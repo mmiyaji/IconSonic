@@ -169,6 +169,11 @@ public sealed partial class MainPage : Page
             return;
         }
 
+        if (ViewModel.ActiveTool is EditorTool.Pencil or EditorTool.Eraser or EditorTool.Fill)
+        {
+            ViewModel.RecordUndoCheckpoint();
+        }
+
         ViewModel.ApplyToolAt(x, y);
         ViewModel.SetPointerPosition(x, y);
     }
@@ -210,6 +215,28 @@ public sealed partial class MainPage : Page
     private void EditorSurface_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         UpdateGridOverlay();
+    }
+
+    private void UndoKeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        if (ViewModel.UndoCommand.CanExecute(null))
+        {
+            ViewModel.UndoCommand.Execute(null);
+            FrameListView.SelectedItem = ViewModel.SelectedFrame;
+            UpdateGridOverlay();
+            args.Handled = true;
+        }
+    }
+
+    private void RedoKeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        if (ViewModel.RedoCommand.CanExecute(null))
+        {
+            ViewModel.RedoCommand.Execute(null);
+            FrameListView.SelectedItem = ViewModel.SelectedFrame;
+            UpdateGridOverlay();
+            args.Handled = true;
+        }
     }
 
     private void PaintFromPointer(PointerRoutedEventArgs e)

@@ -10,6 +10,21 @@
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
     mc:Ignorable="d">
 
+    <Page.KeyboardAccelerators>
+        <KeyboardAccelerator
+            Key="Z"
+            Modifiers="Control"
+            Invoked="UndoKeyboardAccelerator_Invoked" />
+        <KeyboardAccelerator
+            Key="Y"
+            Modifiers="Control"
+            Invoked="RedoKeyboardAccelerator_Invoked" />
+        <KeyboardAccelerator
+            Key="Z"
+            Modifiers="Control,Shift"
+            Invoked="RedoKeyboardAccelerator_Invoked" />
+    </Page.KeyboardAccelerators>
+
     <Page.Resources>
         <DataTemplate x:Key="FrameTemplate" x:DataType="models:IconFrame">
             <Grid Padding="8" ColumnSpacing="12" HorizontalAlignment="Stretch" MinWidth="236">
@@ -98,6 +113,27 @@
                 Click="NewBlankButton_Click"
                 Icon="Document"
                 Label="New" />
+            <AppBarSeparator />
+            <AppBarButton
+                x:Name="UndoButton"
+                AutomationProperties.AutomationId="BtnUndo"
+                Command="{x:Bind ViewModel.UndoCommand, Mode=OneTime}"
+                Label="Undo"
+                ToolTipService.ToolTip="Undo (Ctrl+Z)">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE7A7;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton
+                x:Name="RedoButton"
+                AutomationProperties.AutomationId="BtnRedo"
+                Command="{x:Bind ViewModel.RedoCommand, Mode=OneTime}"
+                Label="Redo"
+                ToolTipService.ToolTip="Redo (Ctrl+Y)">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE7A6;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
             <AppBarSeparator />
             <AppBarButton
                 x:Name="ExportIconButton"

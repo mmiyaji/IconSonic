@@ -10,7 +10,10 @@ namespace IconSonic.ViewModels;
 
 public partial class MainPageViewModel : ObservableObject
 {
+    private const int MaxHistoryDepth = 80;
     private readonly IconImageService _imageService = new();
+    private readonly List<DocumentSnapshot> _undoHistory = [];
+    private readonly List<DocumentSnapshot> _redoHistory = [];
 
     public MainPageViewModel()
     {
@@ -67,6 +70,10 @@ public partial class MainPageViewModel : ObservableObject
 
     public bool HasFrames => Frames.Count > 0;
 
+    public bool CanUndo => _undoHistory.Count > 0;
+
+    public bool CanRedo => _redoHistory.Count > 0;
+
     public WriteableBitmap? SelectedPreview => SelectedFrame?.Preview;
 
     public string SelectedFrameTitle => SelectedFrame is null ? "No frame selected" : $"{SelectedFrame.SizeLabel} pixel editor";
@@ -100,6 +107,7 @@ public partial class MainPageViewModel : ObservableObject
         {
             IReadOnlyList<IconFrame> loaded = await _imageService.LoadRasterAsync(path);
             ReplaceFrames(loaded);
+            ClearHistory();
             DocumentName = Path.GetFileNameWithoutExtension(path);
             StatusText = "Image loaded and scaled into Windows icon sizes.";
         });
@@ -112,6 +120,7 @@ public partial class MainPageViewModel : ObservableObject
         {
             IReadOnlyList<IconFrame> loaded = await _imageService.LoadIconAsync(path);
             ReplaceFrames(loaded);
+            ClearHistory();
             DocumentName = Path.GetFileNameWithoutExtension(path);
             StatusText = "ICO frames loaded.";
         });
@@ -130,6 +139,7 @@ public partial class MainPageViewModel : ObservableObject
     [RelayCommand]
     public void NewBlank()
     {
+        RecordUndoCheckpoint();
         Frames.Clear();
         foreach (int size in IconImageService.DefaultIconSizes)
         {
@@ -152,6 +162,7 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
+        RecordUndoCheckpoint();
         IconFrame frame = _imageService.CreateBlankFrame(size);
         Frames.Add(frame);
         SortFrames();
@@ -174,6 +185,7 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
+        RecordUndoCheckpoint();
         IconFrame copy = _imageService.ResizeFrame(SelectedFrame, size);
         Frames.Add(copy);
         SortFrames();
@@ -190,6 +202,7 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
+        RecordUndoCheckpoint();
         foreach (IconFrame frame in GetAffectedFrames())
         {
             frame.ReplacePixels(new byte[frame.Size * frame.Size * 4]);
@@ -208,6 +221,7 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
+        RecordUndoCheckpoint();
         IconFrame source = SelectedFrame;
         Frames.Clear();
         foreach (int size in IconImageService.DefaultIconSizes)
@@ -231,6 +245,7 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
+        RecordUndoCheckpoint();
         foreach (IconFrame frame in GetAffectedFrames())
         {
             byte[] source = frame.ClonePixels();
@@ -258,6 +273,7 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
+        RecordUndoCheckpoint();
         foreach (IconFrame frame in GetAffectedFrames())
         {
             byte[] source = frame.ClonePixels();
@@ -330,6 +346,7 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
+        RecordUndoCheckpoint();
         int sourceSize = SelectedFrame.Size;
         foreach (IconFrame frame in GetAffectedFrames())
         {
@@ -344,6 +361,50 @@ public partial class MainPageViewModel : ObservableObject
 
         RefreshPalette();
         StatusText = IsApplyToAllFrames ? $"Placed {tool} on all sizes." : $"Placed {tool} on {SelectedFrame.SizeLabel}.";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    public void Undo()
+    {
+        if (!CanUndo)
+        {
+            return;
+        }
+
+        DocumentSnapshot current = CaptureSnapshot();
+        DocumentSnapshot previous = PopLast(_undoHistory);
+        _redoHistory.Add(current);
+        RestoreSnapshot(previous);
+        StatusText = "Undid the last edit.";
+        UpdateHistoryState();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRedo))]
+    public void Redo()
+    {
+        if (!CanRedo)
+        {
+            return;
+        }
+
+        DocumentSnapshot current = CaptureSnapshot();
+        DocumentSnapshot next = PopLast(_redoHistory);
+        _undoHistory.Add(current);
+        RestoreSnapshot(next);
+        StatusText = "Redid the edit.";
+        UpdateHistoryState();
+    }
+
+    public void RecordUndoCheckpoint()
+    {
+        _undoHistory.Add(CaptureSnapshot());
+        if (_undoHistory.Count > MaxHistoryDepth)
+        {
+            _undoHistory.RemoveAt(0);
+        }
+
+        _redoHistory.Clear();
+        UpdateHistoryState();
     }
 
     public void SetPointerPosition(int x, int y)
@@ -652,6 +713,60 @@ public partial class MainPageViewModel : ObservableObject
         }
     }
 
+    private DocumentSnapshot CaptureSnapshot()
+    {
+        FrameSnapshot[] frames = Frames
+            .Select(frame => new FrameSnapshot(frame.Size, frame.ClonePixels(), frame.SourceLabel, frame.IsIncluded))
+            .ToArray();
+
+        return new DocumentSnapshot(frames, SelectedFrame?.Size, DocumentName);
+    }
+
+    private void RestoreSnapshot(DocumentSnapshot snapshot)
+    {
+        Frames.Clear();
+        foreach (FrameSnapshot frameSnapshot in snapshot.Frames)
+        {
+            IconFrame frame = new(frameSnapshot.Size, (byte[])frameSnapshot.Pixels.Clone(), frameSnapshot.SourceLabel)
+            {
+                IsIncluded = frameSnapshot.IsIncluded
+            };
+            Frames.Add(frame);
+        }
+
+        DocumentName = snapshot.DocumentName;
+        SelectedFrame = snapshot.SelectedSize is null
+            ? Frames.FirstOrDefault()
+            : Frames.FirstOrDefault(frame => frame.Size == snapshot.SelectedSize.Value) ?? Frames.FirstOrDefault();
+        RefreshPalette();
+        UpdateDocumentStats();
+        OnPropertyChanged(nameof(SelectedPreview));
+        OnPropertyChanged(nameof(SelectedFrameTitle));
+    }
+
+    private void ClearHistory()
+    {
+        _undoHistory.Clear();
+        _redoHistory.Clear();
+        UpdateHistoryState();
+    }
+
+    private void UpdateHistoryState()
+    {
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(CanRedo));
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+    }
+
+    private static DocumentSnapshot PopLast(List<DocumentSnapshot> history)
+    {
+        int index = history.Count - 1;
+        DocumentSnapshot snapshot = history[index];
+        history.RemoveAt(index);
+        return snapshot;
+    }
+
     private void UpdateDocumentStats()
     {
         OnPropertyChanged(nameof(HasFrames));
@@ -746,4 +861,8 @@ public partial class MainPageViewModel : ObservableObject
         frame.RefreshPreview();
         StatusText = $"Filled region at {startX}, {startY}.";
     }
+
+    private sealed record DocumentSnapshot(IReadOnlyList<FrameSnapshot> Frames, int? SelectedSize, string DocumentName);
+
+    private sealed record FrameSnapshot(int Size, byte[] Pixels, string SourceLabel, bool IsIncluded);
 }
