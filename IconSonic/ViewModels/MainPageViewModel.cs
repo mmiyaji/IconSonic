@@ -43,6 +43,12 @@ public partial class MainPageViewModel : ObservableObject
     public partial double NewFrameSize { get; set; } = 32;
 
     [ObservableProperty]
+    public partial bool IsApplyToAllFrames { get; set; }
+
+    [ObservableProperty]
+    public partial double ObjectStrokeWidth { get; set; } = 1;
+
+    [ObservableProperty]
     public partial string DocumentName { get; set; } = "Untitled icon";
 
     [ObservableProperty]
@@ -140,9 +146,15 @@ public partial class MainPageViewModel : ObservableObject
     [RelayCommand]
     public void AddBlankFrame()
     {
-        int size = (int)Math.Clamp(NewFrameSize, 16, 256);
+        int size = NormalizeFrameSize(NewFrameSize);
+        if (TrySelectExistingFrame(size, $"A {size} x {size} frame already exists."))
+        {
+            return;
+        }
+
         IconFrame frame = _imageService.CreateBlankFrame(size);
         Frames.Add(frame);
+        SortFrames();
         SelectedFrame = frame;
         UpdateDocumentStats();
         StatusText = $"Added a blank {size} x {size} frame.";
@@ -156,11 +168,18 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
-        IconFrame copy = new(SelectedFrame.Size, SelectedFrame.ClonePixels(), "Duplicate");
+        int size = NormalizeFrameSize(NewFrameSize);
+        if (TrySelectExistingFrame(size, $"A {size} x {size} frame already exists."))
+        {
+            return;
+        }
+
+        IconFrame copy = _imageService.ResizeFrame(SelectedFrame, size);
         Frames.Add(copy);
+        SortFrames();
         SelectedFrame = copy;
         UpdateDocumentStats();
-        StatusText = $"Duplicated {copy.SizeLabel}.";
+        StatusText = $"Copied the selected image into {copy.SizeLabel}.";
     }
 
     [RelayCommand(CanExecute = nameof(HasSelectedFrame))]
@@ -171,9 +190,13 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
-        SelectedFrame.ReplacePixels(new byte[SelectedFrame.Size * SelectedFrame.Size * 4]);
+        foreach (IconFrame frame in GetAffectedFrames())
+        {
+            frame.ReplacePixels(new byte[frame.Size * frame.Size * 4]);
+        }
+
         RefreshPalette();
-        StatusText = $"Cleared {SelectedFrame.SizeLabel}.";
+        StatusText = IsApplyToAllFrames ? "Cleared all sizes." : $"Cleared {SelectedFrame.SizeLabel}.";
     }
 
     [RelayCommand(CanExecute = nameof(CanRunCommand))]
@@ -208,19 +231,23 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
-        byte[] source = SelectedFrame.ClonePixels();
-        int size = SelectedFrame.Size;
-        byte[] target = new byte[source.Length];
-        for (int y = 0; y < size; y++)
+        foreach (IconFrame frame in GetAffectedFrames())
         {
-            for (int x = 0; x < size; x++)
+            byte[] source = frame.ClonePixels();
+            int size = frame.Size;
+            byte[] target = new byte[source.Length];
+            for (int y = 0; y < size; y++)
             {
-                Buffer.BlockCopy(source, ((y * size) + x) * 4, target, ((y * size) + (size - 1 - x)) * 4, 4);
+                for (int x = 0; x < size; x++)
+                {
+                    Buffer.BlockCopy(source, ((y * size) + x) * 4, target, ((y * size) + (size - 1 - x)) * 4, 4);
+                }
             }
+
+            frame.ReplacePixels(target);
         }
 
-        SelectedFrame.ReplacePixels(target);
-        StatusText = $"Mirrored {SelectedFrame.SizeLabel} horizontally.";
+        StatusText = IsApplyToAllFrames ? "Mirrored all sizes horizontally." : $"Mirrored {SelectedFrame.SizeLabel} horizontally.";
     }
 
     [RelayCommand(CanExecute = nameof(HasSelectedFrame))]
@@ -231,16 +258,20 @@ public partial class MainPageViewModel : ObservableObject
             return;
         }
 
-        byte[] source = SelectedFrame.ClonePixels();
-        int size = SelectedFrame.Size;
-        byte[] target = new byte[source.Length];
-        for (int y = 0; y < size; y++)
+        foreach (IconFrame frame in GetAffectedFrames())
         {
-            Buffer.BlockCopy(source, y * size * 4, target, (size - 1 - y) * size * 4, size * 4);
+            byte[] source = frame.ClonePixels();
+            int size = frame.Size;
+            byte[] target = new byte[source.Length];
+            for (int y = 0; y < size; y++)
+            {
+                Buffer.BlockCopy(source, y * size * 4, target, (size - 1 - y) * size * 4, size * 4);
+            }
+
+            frame.ReplacePixels(target);
         }
 
-        SelectedFrame.ReplacePixels(target);
-        StatusText = $"Mirrored {SelectedFrame.SizeLabel} vertically.";
+        StatusText = IsApplyToAllFrames ? "Mirrored all sizes vertically." : $"Mirrored {SelectedFrame.SizeLabel} vertically.";
     }
 
     public void ApplyToolAt(int x, int y)
@@ -253,17 +284,29 @@ public partial class MainPageViewModel : ObservableObject
         switch (ActiveTool)
         {
             case EditorTool.Pencil:
-                SelectedFrame.SetPixel(x, y, BrushColor.R, BrushColor.G, BrushColor.B, BrushColor.A);
-                SelectedFrame.RefreshPreview();
+                foreach ((IconFrame frame, int targetX, int targetY) in GetMappedTargetPoints(x, y))
+                {
+                    frame.SetPixel(targetX, targetY, BrushColor.R, BrushColor.G, BrushColor.B, BrushColor.A);
+                    frame.RefreshPreview();
+                }
+
                 RefreshPalette();
                 break;
             case EditorTool.Eraser:
-                SelectedFrame.SetPixel(x, y, 0, 0, 0, 0);
-                SelectedFrame.RefreshPreview();
+                foreach ((IconFrame frame, int targetX, int targetY) in GetMappedTargetPoints(x, y))
+                {
+                    frame.SetPixel(targetX, targetY, 0, 0, 0, 0);
+                    frame.RefreshPreview();
+                }
+
                 RefreshPalette();
                 break;
             case EditorTool.Fill:
-                FloodFill(x, y);
+                foreach ((IconFrame frame, int targetX, int targetY) in GetMappedTargetPoints(x, y))
+                {
+                    FloodFill(frame, targetX, targetY);
+                }
+
                 RefreshPalette();
                 break;
             case EditorTool.Eyedropper:
@@ -272,6 +315,35 @@ public partial class MainPageViewModel : ObservableObject
                 StatusText = $"Picked #{a:X2}{r:X2}{g:X2}{b:X2}.";
                 break;
         }
+    }
+
+    public void ApplyObjectTool(int startX, int startY, int endX, int endY)
+    {
+        if (SelectedFrame is null)
+        {
+            return;
+        }
+
+        EditorTool tool = ActiveTool;
+        if (!IsObjectTool(tool))
+        {
+            return;
+        }
+
+        int sourceSize = SelectedFrame.Size;
+        foreach (IconFrame frame in GetAffectedFrames())
+        {
+            int x1 = MapCoordinate(startX, sourceSize, frame.Size);
+            int y1 = MapCoordinate(startY, sourceSize, frame.Size);
+            int x2 = MapCoordinate(endX, sourceSize, frame.Size);
+            int y2 = MapCoordinate(endY, sourceSize, frame.Size);
+            int strokeWidth = Math.Max(1, (int)Math.Round(ObjectStrokeWidth * frame.Size / sourceSize));
+            DrawObject(frame, tool, x1, y1, x2, y2, strokeWidth);
+            frame.RefreshPreview();
+        }
+
+        RefreshPalette();
+        StatusText = IsApplyToAllFrames ? $"Placed {tool} on all sizes." : $"Placed {tool} on {SelectedFrame.SizeLabel}.";
     }
 
     public void SetPointerPosition(int x, int y)
@@ -324,7 +396,10 @@ public partial class MainPageViewModel : ObservableObject
     private void ReplaceFrames(IReadOnlyList<IconFrame> loaded)
     {
         Frames.Clear();
-        foreach (IconFrame frame in loaded)
+        foreach (IconFrame frame in loaded
+            .GroupBy(frame => frame.Size)
+            .Select(group => group.First())
+            .OrderBy(frame => frame.Size))
         {
             Frames.Add(frame);
         }
@@ -334,6 +409,247 @@ public partial class MainPageViewModel : ObservableObject
 
         RefreshPalette();
         UpdateDocumentStats();
+    }
+
+    private static bool IsObjectTool(EditorTool tool)
+    {
+        return tool is EditorTool.Line
+            or EditorTool.Arrow
+            or EditorTool.Rectangle
+            or EditorTool.Ellipse
+            or EditorTool.Bezier;
+    }
+
+    private IconFrame[] GetAffectedFrames()
+    {
+        if (SelectedFrame is null)
+        {
+            return [];
+        }
+
+        return IsApplyToAllFrames ? Frames.ToArray() : [SelectedFrame];
+    }
+
+    private IEnumerable<(IconFrame Frame, int X, int Y)> GetMappedTargetPoints(int x, int y)
+    {
+        if (SelectedFrame is null)
+        {
+            yield break;
+        }
+
+        int sourceSize = SelectedFrame.Size;
+        foreach (IconFrame frame in GetAffectedFrames())
+        {
+            yield return (frame, MapCoordinate(x, sourceSize, frame.Size), MapCoordinate(y, sourceSize, frame.Size));
+        }
+    }
+
+    private bool TrySelectExistingFrame(int size, string message)
+    {
+        IconFrame? existingFrame = Frames.FirstOrDefault(frame => frame.Size == size);
+        if (existingFrame is null)
+        {
+            return false;
+        }
+
+        SelectedFrame = existingFrame;
+        StatusText = message;
+        return true;
+    }
+
+    private void SortFrames()
+    {
+        IconFrame? selectedFrame = SelectedFrame;
+        IconFrame[] orderedFrames = Frames.OrderBy(frame => frame.Size).ToArray();
+        Frames.Clear();
+        foreach (IconFrame frame in orderedFrames)
+        {
+            Frames.Add(frame);
+        }
+
+        if (selectedFrame is not null && Frames.Contains(selectedFrame))
+        {
+            SelectedFrame = selectedFrame;
+        }
+    }
+
+    private static int NormalizeFrameSize(double size)
+    {
+        return (int)Math.Clamp(Math.Round(size), 16, 256);
+    }
+
+    private static int MapCoordinate(int coordinate, int sourceSize, int targetSize)
+    {
+        if (sourceSize <= 1)
+        {
+            return 0;
+        }
+
+        return Math.Clamp((int)Math.Round(coordinate * (targetSize - 1) / (double)(sourceSize - 1)), 0, targetSize - 1);
+    }
+
+    private void DrawObject(IconFrame frame, EditorTool tool, int x1, int y1, int x2, int y2, int strokeWidth)
+    {
+        switch (tool)
+        {
+            case EditorTool.Line:
+                DrawLine(frame, x1, y1, x2, y2, strokeWidth);
+                break;
+            case EditorTool.Arrow:
+                DrawArrow(frame, x1, y1, x2, y2, strokeWidth);
+                break;
+            case EditorTool.Rectangle:
+                DrawRectangle(frame, x1, y1, x2, y2, strokeWidth);
+                break;
+            case EditorTool.Ellipse:
+                DrawEllipse(frame, x1, y1, x2, y2, strokeWidth);
+                break;
+            case EditorTool.Bezier:
+                DrawBezier(frame, x1, y1, x2, y2, strokeWidth);
+                break;
+        }
+    }
+
+    private void DrawRectangle(IconFrame frame, int x1, int y1, int x2, int y2, int strokeWidth)
+    {
+        int left = Math.Min(x1, x2);
+        int right = Math.Max(x1, x2);
+        int top = Math.Min(y1, y2);
+        int bottom = Math.Max(y1, y2);
+
+        DrawLine(frame, left, top, right, top, strokeWidth);
+        DrawLine(frame, right, top, right, bottom, strokeWidth);
+        DrawLine(frame, right, bottom, left, bottom, strokeWidth);
+        DrawLine(frame, left, bottom, left, top, strokeWidth);
+    }
+
+    private void DrawEllipse(IconFrame frame, int x1, int y1, int x2, int y2, int strokeWidth)
+    {
+        double centerX = (x1 + x2) / 2.0;
+        double centerY = (y1 + y2) / 2.0;
+        double radiusX = Math.Abs(x2 - x1) / 2.0;
+        double radiusY = Math.Abs(y2 - y1) / 2.0;
+
+        if (radiusX < 0.5 || radiusY < 0.5)
+        {
+            DrawLine(frame, x1, y1, x2, y2, strokeWidth);
+            return;
+        }
+
+        int steps = Math.Max(24, (int)Math.Ceiling(Math.Max(radiusX, radiusY) * 8));
+        int previousX = (int)Math.Round(centerX + radiusX);
+        int previousY = (int)Math.Round(centerY);
+        for (int i = 1; i <= steps; i++)
+        {
+            double angle = Math.Tau * i / steps;
+            int nextX = (int)Math.Round(centerX + Math.Cos(angle) * radiusX);
+            int nextY = (int)Math.Round(centerY + Math.Sin(angle) * radiusY);
+            DrawLine(frame, previousX, previousY, nextX, nextY, strokeWidth);
+            previousX = nextX;
+            previousY = nextY;
+        }
+    }
+
+    private void DrawArrow(IconFrame frame, int x1, int y1, int x2, int y2, int strokeWidth)
+    {
+        DrawLine(frame, x1, y1, x2, y2, strokeWidth);
+
+        double angle = Math.Atan2(y2 - y1, x2 - x1);
+        double length = Math.Sqrt(Math.Pow(x2 - x1, 2) + Math.Pow(y2 - y1, 2));
+        double headLength = Math.Max(3, length * 0.25);
+        const double headAngle = Math.PI / 7;
+
+        int wing1X = (int)Math.Round(x2 - Math.Cos(angle - headAngle) * headLength);
+        int wing1Y = (int)Math.Round(y2 - Math.Sin(angle - headAngle) * headLength);
+        int wing2X = (int)Math.Round(x2 - Math.Cos(angle + headAngle) * headLength);
+        int wing2Y = (int)Math.Round(y2 - Math.Sin(angle + headAngle) * headLength);
+
+        DrawLine(frame, x2, y2, wing1X, wing1Y, strokeWidth);
+        DrawLine(frame, x2, y2, wing2X, wing2Y, strokeWidth);
+    }
+
+    private void DrawBezier(IconFrame frame, int x1, int y1, int x2, int y2, int strokeWidth)
+    {
+        double deltaX = x2 - x1;
+        double deltaY = y2 - y1;
+        double length = Math.Max(1, Math.Sqrt(deltaX * deltaX + deltaY * deltaY));
+        double normalX = -deltaY / length;
+        double normalY = deltaX / length;
+        double bend = length * 0.28;
+
+        double control1X = x1 + deltaX * 0.33 + normalX * bend;
+        double control1Y = y1 + deltaY * 0.33 + normalY * bend;
+        double control2X = x1 + deltaX * 0.66 + normalX * bend;
+        double control2Y = y1 + deltaY * 0.66 + normalY * bend;
+
+        int previousX = x1;
+        int previousY = y1;
+        int steps = Math.Max(20, (int)Math.Ceiling(length * 2));
+        for (int i = 1; i <= steps; i++)
+        {
+            double t = i / (double)steps;
+            double inverse = 1 - t;
+            double nextX = inverse * inverse * inverse * x1
+                + 3 * inverse * inverse * t * control1X
+                + 3 * inverse * t * t * control2X
+                + t * t * t * x2;
+            double nextY = inverse * inverse * inverse * y1
+                + 3 * inverse * inverse * t * control1Y
+                + 3 * inverse * t * t * control2Y
+                + t * t * t * y2;
+
+            DrawLine(frame, previousX, previousY, (int)Math.Round(nextX), (int)Math.Round(nextY), strokeWidth);
+            previousX = (int)Math.Round(nextX);
+            previousY = (int)Math.Round(nextY);
+        }
+    }
+
+    private void DrawLine(IconFrame frame, int x1, int y1, int x2, int y2, int strokeWidth)
+    {
+        int dx = Math.Abs(x2 - x1);
+        int dy = -Math.Abs(y2 - y1);
+        int stepX = x1 < x2 ? 1 : -1;
+        int stepY = y1 < y2 ? 1 : -1;
+        int error = dx + dy;
+        int x = x1;
+        int y = y1;
+
+        while (true)
+        {
+            DrawBrush(frame, x, y, strokeWidth);
+            if (x == x2 && y == y2)
+            {
+                break;
+            }
+
+            int e2 = 2 * error;
+            if (e2 >= dy)
+            {
+                error += dy;
+                x += stepX;
+            }
+
+            if (e2 <= dx)
+            {
+                error += dx;
+                y += stepY;
+            }
+        }
+    }
+
+    private void DrawBrush(IconFrame frame, int centerX, int centerY, int strokeWidth)
+    {
+        int radius = Math.Max(0, strokeWidth / 2);
+        for (int y = centerY - radius; y <= centerY + radius; y++)
+        {
+            for (int x = centerX - radius; x <= centerX + radius; x++)
+            {
+                if (radius == 0 || Math.Pow(x - centerX, 2) + Math.Pow(y - centerY, 2) <= radius * radius)
+                {
+                    frame.SetPixel(x, y, BrushColor.R, BrushColor.G, BrushColor.B, BrushColor.A);
+                }
+            }
+        }
     }
 
     private void UpdateDocumentStats()
@@ -371,20 +687,15 @@ public partial class MainPageViewModel : ObservableObject
         }
     }
 
-    private void FloodFill(int startX, int startY)
+    private void FloodFill(IconFrame frame, int startX, int startY)
     {
-        if (SelectedFrame is null)
-        {
-            return;
-        }
-
-        int size = SelectedFrame.Size;
+        int size = frame.Size;
         if (startX < 0 || startY < 0 || startX >= size || startY >= size)
         {
             return;
         }
 
-        byte[] pixels = SelectedFrame.Pixels;
+        byte[] pixels = frame.Pixels;
         int startOffset = ((startY * size) + startX) * 4;
         byte targetB = pixels[startOffset];
         byte targetG = pixels[startOffset + 1];
@@ -432,7 +743,7 @@ public partial class MainPageViewModel : ObservableObject
             queue.Enqueue((x, y - 1));
         }
 
-        SelectedFrame.RefreshPreview();
+        frame.RefreshPreview();
         StatusText = $"Filled region at {startX}, {startY}.";
     }
 }

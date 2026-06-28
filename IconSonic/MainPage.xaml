@@ -203,11 +203,11 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <StackPanel Spacing="2">
                         <TextBlock
                             Text="{x:Bind ViewModel.SelectedFrameTitle, Mode=OneWay}"
@@ -218,7 +218,8 @@
                             Style="{StaticResource CaptionTextBlockStyle}" />
                     </StackPanel>
                     <CommandBar
-                        Grid.Column="1"
+                        Grid.Row="1"
+                        HorizontalAlignment="Left"
                         DefaultLabelPosition="Collapsed"
                         IsOpen="False"
                         OverflowButtonVisibility="Collapsed">
@@ -267,6 +268,62 @@
                                 <FontIcon Glyph="&#xE721;" />
                             </AppBarToggleButton.Icon>
                         </AppBarToggleButton>
+                        <AppBarSeparator />
+                        <AppBarToggleButton
+                            x:Name="LineToolButton"
+                            AutomationProperties.AutomationId="TglLineTool"
+                            Click="ToolButton_Click"
+                            Label="Line"
+                            Tag="Line"
+                            ToolTipService.ToolTip="Line">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xE738;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
+                        <AppBarToggleButton
+                            x:Name="ArrowToolButton"
+                            AutomationProperties.AutomationId="TglArrowTool"
+                            Click="ToolButton_Click"
+                            Label="Arrow"
+                            Tag="Arrow"
+                            ToolTipService.ToolTip="Arrow">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xE72A;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
+                        <AppBarToggleButton
+                            x:Name="RectangleToolButton"
+                            AutomationProperties.AutomationId="TglRectangleTool"
+                            Click="ToolButton_Click"
+                            Label="Rectangle"
+                            Tag="Rectangle"
+                            ToolTipService.ToolTip="Rectangle">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xE73A;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
+                        <AppBarToggleButton
+                            x:Name="EllipseToolButton"
+                            AutomationProperties.AutomationId="TglEllipseTool"
+                            Click="ToolButton_Click"
+                            Label="Ellipse"
+                            Tag="Ellipse"
+                            ToolTipService.ToolTip="Ellipse">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xEA3A;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
+                        <AppBarToggleButton
+                            x:Name="BezierToolButton"
+                            AutomationProperties.AutomationId="TglBezierTool"
+                            Click="ToolButton_Click"
+                            Label="Bezier"
+                            Tag="Bezier"
+                            ToolTipService.ToolTip="Bezier curve">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xE734;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
                     </CommandBar>
                 </Grid>
 
@@ -295,6 +352,9 @@
                         <Canvas
                             x:Name="GridOverlay"
                             IsHitTestVisible="False" />
+                        <Canvas
+                            x:Name="ObjectPreviewOverlay"
+                            IsHitTestVisible="False" />
                     </Grid>
                 </Border>
             </Grid>
@@ -305,6 +365,30 @@
                 BorderThickness="1,0,0,0"
                 VerticalScrollBarVisibility="Auto">
                 <StackPanel Padding="16" Spacing="20">
+                    <StackPanel Spacing="12">
+                        <TextBlock
+                            Text="Scope"
+                            Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <ToggleSwitch
+                            AutomationProperties.AutomationId="TglApplyToAllSizes"
+                            Header="Apply to all sizes"
+                            IsOn="{x:Bind ViewModel.IsApplyToAllFrames, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="12">
+                        <TextBlock
+                            Text="Objects"
+                            Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <NumberBox
+                            AutomationProperties.AutomationId="NumObjectStrokeWidth"
+                            Header="Stroke"
+                            Minimum="1"
+                            Maximum="16"
+                            SmallChange="1"
+                            SpinButtonPlacementMode="Inline"
+                            Value="{x:Bind ViewModel.ObjectStrokeWidth, Mode=TwoWay}" />
+                    </StackPanel>
+
                     <StackPanel Spacing="12">
                         <TextBlock
                             Text="Color"
@@ -356,11 +440,11 @@
                         </Button>
                         <Button
                             HorizontalAlignment="Stretch"
-                            AutomationProperties.AutomationId="BtnDuplicateSelected"
+                            AutomationProperties.AutomationId="BtnCopySelectedToSize"
                             Command="{x:Bind ViewModel.DuplicateSelectedCommand, Mode=OneTime}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE8C8;" />
-                                <TextBlock Text="Duplicate selected" />
+                                <TextBlock Text="Copy selected to size" />
                             </StackPanel>
                         </Button>
                     </StackPanel>

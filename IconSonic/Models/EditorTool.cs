@@ -5,5 +5,10 @@ public enum EditorTool
     Pencil,
     Eraser,
     Fill,
-    Eyedropper
+    Eyedropper,
+    Line,
+    Arrow,
+    Rectangle,
+    Ellipse,
+    Bezier
 }
